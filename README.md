@@ -17,7 +17,8 @@ python train_classifier.py
 ```
 
 Parameters to take into account:
---dataset", help="Dataset to train", default='./dataset_classif'
+
+**--dataset", help="Dataset to train", default='./dataset_classif'**
 
 --init_lr", help="Initial learning rate", default=1e-3
 
@@ -36,8 +37,6 @@ Parameters to take into account:
 --save_model,  help="whether to save the model weights while training",  default=1
 
 
-
-Change --dataset to the path of your dataset folder.
 
 ## Datasets
 
