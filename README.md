@@ -1,6 +1,6 @@
 # Semantic Segmentation
 
-##Dependencies
+## Dependencies
 * python (2.7)
 
 Install with pip:
@@ -11,7 +11,7 @@ Install with pip:
 * tensorflow-gpu
 * keras
 
-##Training the classifier
+## Training the classifier
 ```
 python train_classifier.py
 ```
@@ -32,38 +32,30 @@ Change --dataset to the path of your dataset folder.
 ##Datasets
 
 
-Classification datasets structure:
-* train
-    * class_1
-        * image_1
-        * ...
-    * class_2 
-        * image_1
-        * ...
-    * class_N
-		* ...
-* test
-    * class_1
-        * image_1
-        * ...
-    * class_2 
-        * image_1
-        * ...
-    * class_N
-		* ...
+* Classification datasets structure:
+	* train
+	    * class_1
+	    	* image_1
+	    * calss_2
+	    	* image_1
+	    * class_N
+	    	* image_1
+	* test
+	    * class_1
+	    	* image_1
+	    * class_2
+	    	* image_1
+	    * class_N
+	    	* image_1
 
-Segmentation dataset structure:
-* images
-    * train
-        * image_1
-        * ...
-    * test
-        * image_1
-        * ...
-* labels
-    * train
-        * image_1
-        * ...
-    * test
-        * image_1
-        * ...
+* Segmentation dataset structure:
+	* images
+	    * train
+	    	* image_1
+	    * test
+	    	* image_1
+	* labels
+	    * train
+	    	* image_1
+	    * test
+	    	* image_1
