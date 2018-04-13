@@ -2,6 +2,7 @@ import tensorflow as tf
 
 
 def encoder_classif(input_x=None, n_classes=20, weights=None, width=224, height=224, channels=3, training=True):
+PONER DE ENCODER LA DE NASNET Y DE DECODER LO QUE TENIA EN LA DE SEGMENTACION NORMAL
 
     layer_index = 0
     # a layer instance is callable on a tensor, and returns a tensor
@@ -41,7 +42,7 @@ def encoder_decoder(input_x=None, n_classes=20, weights=None, width=224, height=
     # paddign same, filtros mas pequemos.. 
 
 #hacer capas profundas con poca kernels, tambien hacer con dilataicones y con saltos
-
+PONER DE ENCODER LA DE NASNET Y DE DECODER LO QUE TENIA EN LA DE SEGMENTACION NORMAL
     layer_index = 0
     # a layer instance is callable on a tensor, and returns a tensor
     x = conv2d_simple(input_x, 48, 3, 3, padding='same', strides=(2, 2), training=training, layer_index=layer_index)

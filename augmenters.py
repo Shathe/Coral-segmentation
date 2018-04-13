@@ -4,6 +4,7 @@ import cv2
 import random
 
 
+
 def get_augmenter(name, c_val=0, vertical_flip=True):
     if name:
         alot = lambda aug: iaa.Sometimes(0.75, aug)
@@ -19,8 +20,8 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                 sometimes(iaa.Add((-30, 30))),
                 sometimes(iaa.Multiply((0.80, 1.20), per_channel=False)),
                 sometimes(iaa.GaussianBlur(sigma=(0, 0.10))),
-                # few(iaa.CoarseDropout(p=(0.05, 0.15), size_percent=(0.15, 0.35), per_channel=True)),
-                # few(iaa.CoarseDropout(p=(0.05, 0.15), size_percent=(0.15, 0.35), per_channel=False)),
+                few(iaa.CoarseDropout(p=(0.05, 0.15), size_percent=(0.15, 0.35), per_channel=True)),
+                few(iaa.CoarseDropout(p=(0.05, 0.15), size_percent=(0.15, 0.35), per_channel=False)),
                 sometimes(iaa.ContrastNormalization((0.75, 1.35))),
                 alot(iaa.Affine(
                     scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
@@ -43,25 +44,21 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                 value_flip=1
             else:
                 value_flip=0
+                
             value_flip2 = round(random.random())
             if value_flip2>0.5:
-                value_flip=1
+                value_flip2=1
             else:
-                value_flip=0
+                value_flip2=0
 
-            value_add = random.uniform(-20, 20)
-            value_Multiply = random.uniform(0.8, 1.2)
-            value_GaussianBlur = random.uniform(0.0,0.15)
-            value_CoarseDropout = random.uniform(0.05, 0.15)
-            value_CoarseDropout2 = random.uniform(0.05, 0.15)
-            value_CoarseDropout3 = random.uniform(0.15, 0.35)
-            value_CoarseDropout4 = random.uniform(0.15, 0.35)
-            ContrastNormalization = random.uniform(0.75, 1.40)
-            value_x = random.uniform(0.80, 1.45)
-            value_y = random.uniform(0.80, 1.45)
-            value_x2 = random.uniform(-0.35, 0.35)
+            value_add = random.uniform(-15, 15)
+            value_Multiply = random.uniform(0.9, 1.1)
+            value_GaussianBlur = random.uniform(0.0,0.40)
+            ContrastNormalization = random.uniform(0.79, 1.35)
+            scale = random.uniform(0.8, 1.3)
+            value_x2 = random.uniform(-0.30, 0.30)
             value_y2 = random.uniform(-0.20, 0.20)
-            val_rotate = random.uniform(-18,18)
+            val_rotate = random.uniform(-13,13)
 
             '''
             sometimes(iaa.Add((value_add, value_add))),
@@ -76,8 +73,8 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
             seq_image = iaa.Sequential([
                 iaa.Fliplr(value_flip),  # horizontally flip 50% of the images
                 # iaa.Flipud(value_flip2),  # vertically flip 50% of the images
-                alot(iaa.Affine(
-                    scale={"x": (value_x), "y": (value_y)},
+                iaa.Affine(
+                    scale={"x": (scale), "y": (scale)},
                     # scale images to 80-120% of their size, individually per axis
                     translate_percent={"x": (value_x2), "y": (value_y2)},
                     # translate by -20 to +20 percent (per axis)
@@ -90,11 +87,11 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                     # cval=c_val,  # if mode is constant, use a cval between 0 and 255
                     # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)
 
-                ))])
+                )])
             
             seq_image2 = iaa.Sequential([
-                sometimes(iaa.Add((value_add, value_add))),
-                sometimes(iaa.Multiply((value_Multiply, value_Multiply), per_channel=False)),
+                #sometimes(iaa.Add((value_add, value_add))),
+                #sometimes(iaa.Multiply((value_Multiply, value_Multiply), per_channel=False)),
                 sometimes(iaa.GaussianBlur(sigma=(value_GaussianBlur, value_GaussianBlur))),
                 sometimes(iaa.ContrastNormalization((ContrastNormalization, ContrastNormalization)))])
             
@@ -103,8 +100,8 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
             seq_label = iaa.Sequential([
                 iaa.Fliplr(value_flip),  # horizontally flip 50% of the images
                 # iaa.Flipud(value_flip2),  # vertically flip 50% of the images
-                alot(iaa.Affine(
-                    scale={"x": (value_x), "y": (value_y)},
+                iaa.Affine(
+                    scale={"x": (scale), "y": (scale)},
                     # scale images to 80-120% of their size, individually per axis
                     translate_percent={"x": (value_x2), "y": (value_y2)},
                     # translate by -20 to +20 percent (per axis)
@@ -114,15 +111,15 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                     mode="constant" # `edge`, `wrap`, `reflect` or `symmetric`
                     # cval=(0, 255),  # if mode is constant, use a cval between 0 and 255
                     # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)
-                ))])
+                )])
 
 
             
             seq_mask = iaa.Sequential([
                 iaa.Fliplr(value_flip),  # horizontally flip 50% of the images
                 # iaa.Flipud(value_flip2),  # vertically flip 50% of the images
-                alot(iaa.Affine(
-                    scale={"x": (value_x), "y": (value_y)},
+                iaa.Affine(
+                    scale={"x": (scale), "y": (scale)},
                     # scale images to 80-120% of their size, individually per axis
                     translate_percent={"x": (value_x2), "y": (value_y2)},
                     # translate by -20 to +20 percent (per axis)
@@ -132,7 +129,7 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                     mode="constant" # `edge`, `wrap`, `reflect` or `symmetric`
                     # cval=c_val,  # if mode is constant, use a cval between 0 and 255
                     # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)
-                ))])
+                )])
              
 
             return seq_image2, seq_image, seq_label, seq_mask
