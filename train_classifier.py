@@ -19,16 +19,19 @@ import math
 random.seed(os.urandom(9))
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", help="Dataset to train", default='./dataset_classif')  # 'Datasets/MNIST-Big/'
-parser.add_argument("--init_lr", help="Initial learning rate", default=1e-3)
-parser.add_argument("--min_lr", help="Initial learning rate", default=1e-5)
-parser.add_argument("--init_batch_size", help="batch_size", default=16)
-parser.add_argument("--max_batch_size", help="batch_size", default=16)
-parser.add_argument("--epochs", help="Number of epochs to train", default=40)
+parser.add_argument("--dataset", help="Dataset to train", default='/media/msrobot/discoGordo/Corales/patch_data') 
+# parser.add_argument("--dataset", help="Dataset to train", default='dataset_classif')  # 'Datasets/MNIST-Big/'
+parser.add_argument("--init_lr", help="Initial learning rate", default=1e-4)
+parser.add_argument("--min_lr", help="Initial learning rate", default=1e-7)
+parser.add_argument("--init_batch_size", help="batch_size", default=8)
+parser.add_argument("--max_batch_size", help="batch_size", default=8)
+parser.add_argument("--epochs", help="Number of epochs to train", default=3)
 parser.add_argument("--width", help="width", default=224)
 parser.add_argument("--height", help="height", default=224)
 parser.add_argument("--save_model", help="save_model", default=1)
 args = parser.parse_args()
+
+
 
 
 # Hyperparameter
@@ -50,23 +53,28 @@ loader = Loader(dataFolderPath=args.dataset,  problemType = 'classification', wi
 testing_samples = len(loader.test_list)
 training_samples = len(loader.train_list)
 
-
 # For Batch_norm or dropout operations: training or testing
 training_flag = tf.placeholder(tf.bool)
 
 # Placeholder para las imagenes.
-x = tf.placeholder(tf.float32, shape=[None, height, width, channels], name='input')
+# x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input')
+x = tf.placeholder(tf.float32, shape=[None, width, height, channels], name='input') # PUT NONE TO BE DYNAMIC
+
 label = tf.placeholder(tf.float32, shape=[None, loader.n_classes], name='output')
 # Placeholders para las clases (vector de salida que seran valores de 0-1 por cada clase)
 
 # Network
-output = Network.encoder_classif(input_x=x, n_classes=loader.n_classes, width=width, height=height, channels=channels, training=training_flag)
+# output = Network.encoder_nasnet(n_classes=loader.n_classes)
+output = Network.encoder_resnet50(input_x=x, n_classes=loader.n_classes)
 
 learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
 # Loss function
 cross_entropy_cnn = - label * tf.nn.log_softmax(output)
-cost = tf.reduce_mean(cross_entropy_cnn) 
+cross_entropy_cnn_unbatched = tf.reduce_mean(cross_entropy_cnn , axis = 0) 
+cost = tf.reduce_sum(cross_entropy_cnn_unbatched * loader.median_frequency_exp()) 
+
+
 
 # Accuracy function
 correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(label, 1))
@@ -104,14 +112,14 @@ print("Total parameters of the net: " + str(total_parameters)+ " == " + str(tota
 times_show_per_epoch = 15
 saver = tf.train.Saver(tf.global_variables())
 
-if not os.path.exists('./model/best'):
-    os.makedirs('./model/best')
+if not os.path.exists('./models/resnet_encoder/best'):
+    os.makedirs('./models/resnet_encoder/best')
 
 with tf.Session() as sess:
 	# Create the session and  load weigths if it is possible
 	sess.run(tf.global_variables_initializer())
 	sess.run(tf.local_variables_initializer())
-	ckpt_best = tf.train.get_checkpoint_state('./model/best')  # Loader model if exists
+	ckpt_best = tf.train.get_checkpoint_state('./models/resnet_encoder/best')  # Loader model if exists
 	if ckpt_best and tf.train.checkpoint_exists(ckpt_best.model_checkpoint_path):
 		saver.restore(sess, ckpt_best.model_checkpoint_path)
 
@@ -140,14 +148,15 @@ with tf.Session() as sess:
 		# steps in every epoch
 		for step in range(total_batch):
 			# get training data
-			batch_x, batch_y = loader.get_batch(size=batch_size, train=True)#, augmenter='rgb'
-
+			batch_x, batch_y = loader.get_batch(size=batch_size, train=True, augmenter='coral')
 			train_feed_dict = {
 				x: batch_x,
 				label: batch_y,
 				learning_rate: epoch_learning_rate,
 				training_flag: 1
 			}
+
+
 			# TRAIN WITH A BATCH
 			_, loss = sess.run([train, cost], feed_dict=train_feed_dict)
 
@@ -181,11 +190,11 @@ with tf.Session() as sess:
 
 		# save model
 		if save_model:
-			saver.save(sess=sess, save_path='./model/dense.ckpt')
+			saver.save(sess=sess, save_path='./models/resnet_encoder/weigths.ckpt')
 		if save_model and best_val_loss > val_loss_acum:
 			print(save_model)
 			best_val_loss = val_loss_acum
-			saver.save(sess=sess, save_path='./model/best/dense.ckpt')
+			saver.save(sess=sess, save_path='./models/resnet_encoder/best/weigths.ckpt')
 
 		# show tiem to finish training
 		time_second=time.time()

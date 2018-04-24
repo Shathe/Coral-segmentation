@@ -5,7 +5,7 @@ import random
 
 
 
-def get_augmenter(name, c_val=0, vertical_flip=True):
+def get_augmenter(name, c_val=255, vertical_flip=True):
     if name:
         alot = lambda aug: iaa.Sometimes(0.75, aug)
         alw = lambda aug: iaa.Sometimes(1, aug)
@@ -36,6 +36,32 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                     # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)
                 ))])
             return seq_rgb
+
+
+        if 'coral' in name:
+            seq_rgb = iaa.Sequential([
+
+                iaa.Fliplr(0.50),  # horizontally flip 50% of the images
+                iaa.Flipud(0.50),  # vertically flip 50% of the images
+                sometimes(iaa.Add((-30, 30))),
+                sometimes(iaa.Multiply((0.80, 1.20), per_channel=False)),
+                sometimes(iaa.GaussianBlur(sigma=(0, 40))),
+                sometimes(iaa.ContrastNormalization((0.75, 1.35))),
+                alot(iaa.Affine(
+                    scale={"x": (0.7, 1.3), "y": (0.7, 1.3)},
+                    # scale images to 80-120% of their size, individually per axis
+                    translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+                    # translate by -20 to +20 percent (per axis)
+                    rotate=(-45, 45),  # rotate by -45 to +45 degrees
+                    order=1,  #bilinear interpolation (fast)
+                    cval=0,
+                    mode="reflect" # `edge`, `wrap`, `reflect` or `symmetric`
+                    # cval=(0, 255),  # if mode is constant, use a cval between 0 and 255
+                    # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)
+                ))])
+            return seq_rgb
+
+
         elif 'segmentation' in name:
             #create one per image. give iamge, label and mask to the pipeling
 
@@ -125,7 +151,7 @@ def get_augmenter(name, c_val=0, vertical_flip=True):
                     # translate by -20 to +20 percent (per axis)
                     rotate=(val_rotate),  # rotate by -45 to +45 degrees
                     order=0,  #bilinear interpolation (fast)
-                    cval=c_val,
+                    cval=0,
                     mode="constant" # `edge`, `wrap`, `reflect` or `symmetric`
                     # cval=c_val,  # if mode is constant, use a cval between 0 and 255
                     # mode=ia.ALL  # use any of scikit-image's warping modes (see 2nd image from the top for examples)

@@ -70,10 +70,10 @@ training_samples = len(loader.image_train_list)
 training_flag = tf.placeholder(tf.bool)
 
 # Placeholder para las imagenes.
-x = tf.placeholder(tf.float32, shape=[None, height, width, channels], name='input')
+x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input')
 batch_images = tf.reverse(x, axis=[-1]) #opencv rgb -bgr
-label = tf.placeholder(tf.float32, shape=[None, height, width, n_classes], name='output')
-mask_label = tf.placeholder(tf.float32, shape=[None, height, width, n_classes], name='mask')
+label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes + 1], name='output') # the n_classes + 1 is for the ignore classes
+mask_label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes], name='mask')
 # Placeholders para las clases (vector de salida que seran valores de 0-1 por cada clase)
 
 
@@ -81,30 +81,34 @@ learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
 # Network
 output = Network.encoder_decoder(input_x=x, n_classes=n_classes, width=width, height=height, channels=channels, training=training_flag)
-shape_output = output.get_shape()
-label_shape = label.get_shape()
-
+shape_output = tf.shape(output)
+label_shape = tf.shape(output)
 
 predictions = tf.reshape(output, [-1, shape_output[1]* shape_output[2] , shape_output[3]]) # tf.reshape(output, [-1])
 labels = tf.reshape(label, [-1, label_shape[1]* label_shape[2] , label_shape[3]]) # tf.reshape(output, [-1])
-mask_labels = tf.reshape(mask_label, [-1, label_shape[1]* label_shape[2] , label_shape[3]]) # tf.reshape(output, [-1])
+
+# mask_labels = tf.reshape(mask_label, [-1, label_shape[1]* label_shape[2] , label_shape[3] - 1]) # - 1 because of the ignoreclass
 
 # calculate the loss [cross entropy]
 #Clip output (softmax) for -inf values and calculate the log
 #clipped_output =  tf.log(tf.clip_by_value(tf.nn.softmax(predictions), 1e-20, 1e+20))
 log_softmax =  tf.nn.log_softmax(predictions)
+labels_ignore = labels[:,:,n_classes]
+labels = labels[:,:,:n_classes]
+
 # Compare to the label (loss)
 softmax_loss = labels*log_softmax
 # mask the loss
-cost_masked = tf.reduce_mean(softmax_loss*mask_labels, axis=1)
+cost_masked = tf.reduce_mean(softmax_loss, axis=1)
+#cost_masked = tf.reduce_mean(softmax_loss*mask_labels, axis=1)
 # Get hte median frequency weights of the labels
 weights = loader.median_frequency_exp()
 # Apply the tweights to the loss and multiply for the number of classes (you are applying the mean)
 cost_with_weights = tf.reduce_mean(cost_masked*weights*n_classes, axis=1) 
 # For normalizing the loss accoding to the number of pixels calculated, multiply for the percentage of  non mask pixels (valuable pixels)
-mean_masking = tf.reduce_mean(mask_labels)
-cost = -tf.reduce_mean(cost_with_weights, axis=0) / mean_masking
-
+mean_masking = tf.reduce_mean(labels_ignore)
+#cost = -tf.reduce_mean(cost_with_weights, axis=0) / mean_masking
+cost = -tf.reduce_mean(cost_with_weights, axis=0) / (1 - mean_masking)
 
 
 
@@ -132,12 +136,24 @@ mean_accuracy = tf.reduce_mean(accuracy_per_class_sum/labels_sum)
 '''
 
 # Calculate the accuracy
-correct_prediction = tf.equal(tf.argmax(predictions, 2), tf.argmax(labels, 2))
+labels = tf.argmax(labels, 2)
+predictions = tf.argmax(predictions, 2)
 
-correct_prediction_masked=tf.cast(correct_prediction, tf.float32)*tf.reduce_mean(mask_labels, axis=2)
-sum_correc_masked=tf.reduce_sum(correct_prediction_masked)
-sum_mask=tf.reduce_sum(tf.reduce_mean(mask_labels, axis=2))
-accuracy = sum_correc_masked/sum_mask
+labels = tf.reshape(labels,[tf.shape(labels)[0] * tf.shape(labels)[1]])
+predictions = tf.reshape(predictions,[tf.shape(predictions)[0] * tf.shape(predictions)[1]])
+
+
+print(tf.where(tf.less_equal(labels, n_classes - 1)).get_shape())
+
+indices = tf.squeeze(tf.where(tf.less_equal(labels, n_classes - 1))) # ignore all labels >= num_classes 
+labels = tf.cast(tf.gather(labels, indices), tf.int64)
+predictions = tf.gather(predictions, indices)
+
+
+correct_prediction = tf.cast(tf.equal(labels, predictions), tf.float32)
+accuracy = tf.reduce_mean(correct_prediction)
+
+
 
 #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -185,7 +201,7 @@ print("Total parameters of the net: " + str(total_parameters)+ " == " + str(tota
 
  
 # Times to show information of batch traiingn and test
-times_show_per_epoch = 15
+times_show_per_epoch = 5
 
 saver = tf.train.Saver(tf.global_variables())
 

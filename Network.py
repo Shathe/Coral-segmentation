@@ -1,8 +1,47 @@
 import tensorflow as tf
 
 
+
+# Optimal image size (224, 224, 3)
+def encoder_densenet(input_x=None, n_classes=20, weights='imagenet'):
+    net = tf.keras.applications.DenseNet169(include_top=False, weights=weights, input_tensor=input_x, pooling=None, classes=n_classes)
+    x = tf.keras.layers.GlobalAveragePooling2D()(net.output)
+    x = tf.keras.layers.Dense(n_classes, activation=None, name='predictions_no_softmax')(x)
+    #print(x.summary())
+    #output = net.output
+    return x
+
+
+# Optimal image size (331, 331, 3). Minimum 224,224 
+def encoder_resnet50(input_x=None, n_classes=20, weights='imagenet'):
+    net = tf.keras.applications.ResNet50(include_top=False, weights=weights, input_tensor=input_x, pooling=None, classes=n_classes)
+    x = tf.keras.layers.GlobalAveragePooling2D()(net.output)
+    x = tf.keras.layers.Dense(n_classes, activation=None, name='predictions_no_softmax')(x)
+    #print(x.summary())
+    #output = net.output
+    return x
+
+
+
+# Optimal image size (331, 331, 3). Minimum 224,224 
+def encoder_xception(input_x=None, n_classes=20, weights='imagenet'):
+    net = tf.keras.applications.Xception(include_top=False, weights=weights, input_tensor=input_x, pooling=None, classes=n_classes)
+    x = tf.keras.layers.GlobalAveragePooling2D()(net.output)
+    x = tf.keras.layers.Dense(n_classes, activation=None, name='predictions_no_softmax')(x)
+    #print(x.summary())
+    #output = net.output
+    return x
+
+# Optimal image size (331, 331, 3). Minimum 224,224 
+def encoder_inception(input_x=None, n_classes=20, weights='imagenet'):
+    net = tf.keras.applications.InceptionV3(include_top=False, weights=weights, input_tensor=input_x, pooling=None, classes=n_classes)
+    x = tf.keras.layers.GlobalAveragePooling2D()(net.output)
+    x = tf.keras.layers.Dense(n_classes, activation=None, name='predictions_no_softmax')(x)
+    #print(x.summary())
+    #output = net.output
+    return x
+
 def encoder_classif(input_x=None, n_classes=20, weights=None, width=224, height=224, channels=3, training=True):
-PONER DE ENCODER LA DE NASNET Y DE DECODER LO QUE TENIA EN LA DE SEGMENTACION NORMAL
 
     layer_index = 0
     # a layer instance is callable on a tensor, and returns a tensor
@@ -42,7 +81,6 @@ def encoder_decoder(input_x=None, n_classes=20, weights=None, width=224, height=
     # paddign same, filtros mas pequemos.. 
 
 #hacer capas profundas con poca kernels, tambien hacer con dilataicones y con saltos
-PONER DE ENCODER LA DE NASNET Y DE DECODER LO QUE TENIA EN LA DE SEGMENTACION NORMAL
     layer_index = 0
     # a layer instance is callable on a tensor, and returns a tensor
     x = conv2d_simple(input_x, 48, 3, 3, padding='same', strides=(2, 2), training=training, layer_index=layer_index)
