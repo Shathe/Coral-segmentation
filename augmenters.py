@@ -107,7 +107,7 @@ def get_augmenter(name, c_val=255, vertical_flip=True):
                     rotate=(val_rotate),  # rotate by -45 to +45 degrees
                     order=1,  #bilinear interpolation (fast)
                     cval=c_val,
-                    mode="constant",
+                    mode="reflect",
 
                     # `edge`, `wrap`, `reflect` or `symmetric`
                     # cval=c_val,  # if mode is constant, use a cval between 0 and 255

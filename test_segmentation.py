@@ -70,7 +70,7 @@ mask_label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes], nam
 # Network
 output = Network.complex(input_x=x, n_classes=n_classes, width=width, height=height, channels=channels, training=training_flag)
 shape_output = tf.shape(output)
-label_shape = tf.shape(output)
+label_shape = tf.shape(label)
 
 predictions = tf.reshape(output, [-1, shape_output[1]* shape_output[2] , shape_output[3]]) # tf.reshape(output, [-1])
 labels = tf.reshape(label, [-1, label_shape[1]* label_shape[2] , label_shape[3]]) # tf.reshape(output, [-1])
@@ -122,13 +122,21 @@ with tf.Session() as sess:
 			#mask_label: mask_test,
 			training_flag: False
 		}
-		matrix ,acc_update, acc_total, miou_update, miou_total,mean_acc_total, mean_acc_update = sess.run([conf_mat, acc_op, acc, miou_op, miou, mean_acc, mean_acc_op], feed_dict=test_feed_dict)
+		image_salida, matrix ,acc_update, acc_total, miou_update, miou_total,mean_acc_total, mean_acc_update = sess.run([output, conf_mat, acc_op, acc, miou_op, miou, mean_acc, mean_acc_op], feed_dict=test_feed_dict)
 
 		if  i == 0:
 			confusion_matrix_total = matrix
 		else:
 			confusion_matrix_total = confusion_matrix_total + matrix
 
+	if not os.path.exists('output/'):
+		os.makedirs('output/')
+		
+	image_salida = np.argmax(image_salida, 3)
+	for index_output in xrange(max_batch_size):
+		name_split = loader.image_test_list[index_output + i].split('/')
+		name = name_split[len(name_split)-1].replace('.jpg','.png').replace('.jpeg','.png')
+		cv2.imwrite('output/'+name, image_salida[index_output])
 
 	print("Accuracy: " + str(acc_update))
 	print("miou: " + str(miou_total))

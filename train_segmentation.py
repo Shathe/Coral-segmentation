@@ -15,9 +15,9 @@ from augmenters import get_augmenter
 import Network
 import cv2
 import math
-
-
-
+import sys
+sys.path.append("models")
+from DeepLabV3_plus import build_deeplabv3_plus
 
 
 random.seed(os.urandom(9))
@@ -25,17 +25,19 @@ random.seed(os.urandom(9))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", help="Dataset to train", default='./dataset_segmentation')  # 'Datasets/MNIST-Big/'
+#/media/msrobot/discoGordo/Download_april/machine_printed_legible
 parser.add_argument("--dimensions", help="Temporal dimensions to get from each sample", default=3)
 parser.add_argument("--augmentation", help="Image augmentation", default=1)
 parser.add_argument("--init_lr", help="Initial learning rate", default=1e-3)
+parser.add_argument("--lr_decay", help="1 for lr decay, 0 for not", default=0)
 parser.add_argument("--min_lr", help="Initial learning rate", default=1e-8)
 parser.add_argument("--init_batch_size", help="batch_size", default=2)
 parser.add_argument("--max_batch_size", help="batch_size", default=2)
 parser.add_argument("--n_classes", help="number of classes to classify", default=11)
 parser.add_argument("--ignore_label", help="class to ignore", default=11)
 parser.add_argument("--epochs", help="Number of epochs to train", default=350)
-parser.add_argument("--width", help="width", default=224)
-parser.add_argument("--height", help="height", default=224)
+parser.add_argument("--width", help="width", default=512)
+parser.add_argument("--height", help="height", default=512)
 parser.add_argument("--save_model", help="save_model", default=1)
 parser.add_argument("--finetune_encoder", help="whether to finetune_encoder", default=1)
 args = parser.parse_args()
@@ -45,6 +47,7 @@ args = parser.parse_args()
 # Hyperparameter
 init_learning_rate = float(args.init_lr)
 min_learning_rate = float(args.min_lr)
+lr_decay = bool(int(args.lr_decay))
 augmentation = bool(int(args.augmentation))
 save_model = bool(int(args.save_model ))
 init_batch_size = int(args.init_batch_size)
@@ -70,8 +73,8 @@ training_samples = len(loader.image_train_list)
 training_flag = tf.placeholder(tf.bool)
 
 # Placeholder para las imagenes.
-x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input')
-batch_images = tf.reverse(x, axis=[-1]) #opencv rgb -bgr
+input_x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input')
+batch_images = tf.reverse(input_x, axis=[-1]) #opencv rgb -bgr
 label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes + 1], name='output') # the n_classes + 1 is for the ignore classes
 mask_label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes], name='mask')
 # Placeholders para las clases (vector de salida que seran valores de 0-1 por cada clase)
@@ -80,13 +83,13 @@ mask_label = tf.placeholder(tf.float32, shape=[None, None, None, n_classes], nam
 learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
 # Network
-output = Network.encoder_decoder(input_x=x, n_classes=n_classes, width=width, height=height, channels=channels, training=training_flag)
+#output = Network.encoder_decoder(input_x=x, n_classes=n_classes, width=width, height=height, channels=channels, training=training_flag)
+output = Network.encoder_decoder_resnet101(input_x=input_x, n_classes=n_classes, width=width, height=height, channels=channels, training=training_flag)
 shape_output = tf.shape(output)
-label_shape = tf.shape(output)
+label_shape = tf.shape(label)
 
 predictions = tf.reshape(output, [-1, shape_output[1]* shape_output[2] , shape_output[3]]) # tf.reshape(output, [-1])
 labels = tf.reshape(label, [-1, label_shape[1]* label_shape[2] , label_shape[3]]) # tf.reshape(output, [-1])
-
 # mask_labels = tf.reshape(mask_label, [-1, label_shape[1]* label_shape[2] , label_shape[3] - 1]) # - 1 because of the ignoreclass
 
 # calculate the loss [cross entropy]
@@ -109,16 +112,6 @@ cost_with_weights = tf.reduce_mean(cost_masked*weights*n_classes, axis=1)
 mean_masking = tf.reduce_mean(labels_ignore)
 #cost = -tf.reduce_mean(cost_with_weights, axis=0) / mean_masking
 cost = -tf.reduce_mean(cost_with_weights, axis=0) / (1 - mean_masking)
-
-
-
-# For batch norm
-update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-with tf.control_dependencies(update_ops):
-
-	# Uso el optimizador de Adam y se quiere minimizar la funcion de coste
-	optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-	train = optimizer.minimize(cost) # VARIABLES TO PTIMIZE 
 
 
 
@@ -178,30 +171,41 @@ tf.summary.image('label', label_image, max_outputs=10)
 
 
 restore = True
-restore_variables = []
+restore_variables = [var for var in tf.trainable_variables() if 'resnet_v2_101' in var.name]
+decoder_variables =  [var for var in tf.trainable_variables() if 'resnet_v2_101' not in var.name ]
+all_variables =  [var for var in tf.trainable_variables() ]
+
+
 # Count parameters
 total_parameters = 0
 for variable in tf.trainable_variables():
 	# shape is an array of tf.Dimension
 	shape = variable.get_shape()
 	variable_parameters = 1
-	# print(variable.name)
-	'''
-	save into restore_variables the variables of the encoder 
-	'''
-	if 'deconv2d' in variable.name:
-		restore = False
-	if restore:
-		restore_variables = restore_variables + [variable]
+
 	for dim in shape:
 		variable_parameters *= dim.value
 	total_parameters += variable_parameters
 print("Total parameters of the net: " + str(total_parameters)+ " == " + str(total_parameters/1000000.0) + "M")
 
 
+
+
+# For batch norm
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+with tf.control_dependencies(update_ops):
+
+	# Uso el optimizador de Adam y se quiere minimizar la funcion de coste
+	optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate) #adamOptimizer does not need lr decay
+	train = optimizer.minimize(cost, var_list=all_variables) # VARIABLES TO PTIMIZE 
+
+
+
+
+
  
 # Times to show information of batch traiingn and test
-times_show_per_epoch = 5
+times_show_per_epoch = 3
 
 saver = tf.train.Saver(tf.global_variables())
 
@@ -210,18 +214,18 @@ if finetune_encoder:
 
 
 
-if not os.path.exists('./model_decoder/best'):
-    os.makedirs('./model_decoder/best')
+if not os.path.exists('./models/model_decoder/best'):
+    os.makedirs('./models/model_decoder/best')
 
 with tf.Session() as sess:
 	sess.run(tf.global_variables_initializer())
 	sess.run(tf.local_variables_initializer())
 
 
-	ckpt = tf.train.get_checkpoint_state('./model_decoder/best')
+	ckpt = tf.train.get_checkpoint_state('./models/model_decoder/best')
 	if finetune_encoder:
-		ckpt = tf.train.get_checkpoint_state('./model/best')
-
+		ckpt = tf.train.get_checkpoint_state('./models/resnet_encoder/')
+	
 	if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
 		print('Loading model...')
 		saver.restore(sess, ckpt.model_checkpoint_path)
@@ -260,7 +264,7 @@ with tf.Session() as sess:
 			batch_x, batch_y, batch_mask = loader.get_batch(size=batch_size, train=True, augmenter='segmentation')#, augmenter='segmentation'
 
 			train_feed_dict = {
-				x: batch_x,
+				input_x: batch_x,
 				label: batch_y,
 				learning_rate: epoch_learning_rate,
 				mask_label: batch_mask,
@@ -279,7 +283,7 @@ with tf.Session() as sess:
 				batch_x_test, batch_y_test, batch_mask = loader.get_batch(size=batch_size, train=False)
 
 				test_feed_dict = {
-					x: batch_x_test,
+					input_x: batch_x_test,
 					label: batch_y_test,
 					learning_rate: 0,
 					mask_label: batch_mask,
@@ -301,11 +305,11 @@ with tf.Session() as sess:
 
 		# save models
 		if save_model:
-			saver.save(sess=sess, save_path='./model_decoder/dense.ckpt')
+			saver.save(sess=sess, save_path='./models/model_decoder/dense.ckpt')
 		if save_model and best_val_loss > val_loss_acum:
 			print(save_model)
 			best_val_loss = val_loss_acum
-			saver.save(sess=sess, save_path='./model_decoder/best/dense.ckpt')
+			saver.save(sess=sess, save_path='./models/model_decoder/best/dense.ckpt')
 
 		# show tiem to finish training
 		time_second=time.time()
@@ -314,7 +318,8 @@ with tf.Session() as sess:
 		print(str(segundos_per_epoch * epochs_left)+' seconds to end the training. Hours: ' + str(segundos_per_epoch * epochs_left/3600.0))
 	
 		#agument batch_size per epoch and decrease the learning rate
-		epoch_learning_rate = init_learning_rate * math.pow(change_lr_epoch, epoch)
+		if lr_decay:
+			epoch_learning_rate = init_learning_rate * math.pow(change_lr_epoch, epoch) # adamOptimizer does not need lr decay
 		batch_size_decimal = batch_size_decimal + change_batch_size
 	
 

@@ -28,9 +28,10 @@ class Loader:
 		self.height = height
 		self.width = width
 		self.dim = dim 
-		self.ignore_label = ignore_label
-		self.freq = np.zeros(n_classes)
-		self.index = 0
+		self.ignore_label = ignore_label # label to ignore
+		self.freq = np.zeros(n_classes) # vector for calculating the class frequency
+		self.index_train = 0 #indexes for iterating while training
+		self.index_test = 0#indexes for iterating while testing
 		if ignore_label and ignore_label < n_classes:
 
 			raise Exception( 'please, change the labeling in order to put the ignore label value to the last value > nunm_classes')
@@ -55,8 +56,7 @@ class Loader:
 		print('Structuring test and train files...')
 		self.test_list = [file for file in files if '/test/' in file]
 		self.train_list = [file for file in files if '/train/' in file]
-		self.train_list.sort()
-		self.test_list.sort()
+
 		# Check problem type
 		if problemType in problemTypes:
 			self.problemType=problemType
@@ -67,6 +67,17 @@ class Loader:
 		if problemType == 'classification':
 			# The structure has to be dataset/train/class/image.png
 			#Extract dictionary to map class -> label
+
+			# Shuffle train
+			s = np.arange(len(self.train_list))
+			np.random.shuffle(s)
+			self.train_list=np.array(self.train_list)[s]
+
+			# Shuffle test
+			s = np.arange(len(self.test_list))
+			np.random.shuffle(s)
+			self.test_list=np.array(self.test_list)[s]
+
 			print('Loaded '+ str(len(self.train_list)) +' training samples')
 			print('Loaded '+ str(len(self.test_list)) +' testing samples')
 			classes_train = [file.split('/train/')[1].split('/')[0] for file in self.train_list]
@@ -83,6 +94,7 @@ class Loader:
 			# The structure has to be dataset/train/images/image.png
 			# The structure has to be dataset/train/labels/label.png
 			# Separate image and label lists
+			# Sort them to align labels and images
 
 
 			self.image_train_list = [file for file in self.train_list if '/images/' in file]
@@ -95,19 +107,17 @@ class Loader:
 			self.image_train_list.sort()
 
 			# Shuffle train
-			print('self.image_train_list.shape')
-			print(len(self.image_train_list))
 			s = np.arange(len(self.image_train_list))
 			np.random.shuffle(s)
 			self.image_train_list=np.array(self.image_train_list)[s]
 			self.label_train_list=np.array(self.label_train_list)[s]
-
+			'''
 			# Shuffle test
 			s = np.arange(len(self.image_test_list))
 			np.random.shuffle(s)
 			self.image_test_list=np.array(self.image_test_list)[s]
 			self.label_test_list=np.array(self.label_test_list)[s]
-
+			'''
 			print('Loaded '+ str(len(self.image_train_list)) +' training samples')
 			print('Loaded '+ str(len(self.image_test_list)) +' testing samples')
 			self.n_classes = n_classes
@@ -123,17 +133,25 @@ class Loader:
 		y = np.zeros([size, self.height, self.width], dtype=np.uint8)
 		mask_expanded = np.ones([size, self.height, self.width, self.n_classes], dtype=np.uint8)
 
-		image_list = self.image_test_list
-		label_list = self.label_test_list
-		folder = '/test/'
+
+
 		if train:
 			image_list = self.image_train_list
 			label_list = self.label_train_list
+			index_files = self.index_train
 			folder = '/train/'
+			# Get [size] random numbers			
+			indexes = [i%len(image_list) for i in range(self.index_train, self.index_train+size)]
+			self.index_train=indexes[-1] + 1
 
-		# Get [size] random numbers
-		indexes = [i%len(image_list) for i in range(self.index, self.index+size)]
-		self.index=indexes[-1] + 1
+		else:
+			image_list = self.image_test_list
+			label_list = self.label_test_list
+			folder = '/test/'
+		 # Get [size] random numbers
+			indexes = [i%len(image_list) for i in range(self.index_test, self.index_test+size)]
+			self.index_test=indexes[-1] + 1
+
 
 		random_images = [image_list[number] for number in indexes]
 		random_labels = [label_list[number] for number in indexes]
@@ -148,6 +166,10 @@ class Loader:
 
 			label = cv2.imread(random_labels[index],0)
 
+			if img is None or label is  None:
+				print(random_images[index])
+				print(random_labels[index])
+				print(indexes[index])
 
 			if img.shape[1] != self.width or img.shape[0] != self.height:
 				img = cv2.resize(img, (self.width, self.height), interpolation = cv2.INTER_AREA)
@@ -206,10 +228,9 @@ class Loader:
 		y = y.reshape((a,b,c,self.n_classes+1)).astype(np.uint8)
 
 
-		x = x.astype(np.float32) 
-		#tf.keras.applications.imagenet_utils.preprocess_input(x, mode='tf')
-		x = tf.keras.applications.xception.preprocess_input(x)
-		#x = x.astype(np.float32) / 255.0 - 0.5
+¡		#tf.keras.applications.imagenet_utils.preprocess_input(x, mode='tf')
+		#x = tf.keras.applications.xception.preprocess_input(x)
+		x = x.astype(np.float32) / 255.0 - 0.5
 
 		return x, y, mask_expanded 
 
@@ -220,22 +241,30 @@ class Loader:
 		x = np.zeros([size, self.height, self.width, self.dim], dtype=np.float32)
 		y = np.zeros([size], dtype=np.uint8)
 
-		file_list = self.test_list
-		folder = '/test/'
+
 		if train:
 			file_list = self.train_list
 			folder = '/train/'
+			# Get [size] random numbers
+			indexes = [i%len(file_list) for i in range(self.index_train, self.index_train+size)]
+			self.index_train=indexes[-1] + 1
 
-		# Get [size] random numbers
-		indexes = [i%len(file_list) for i in range(self.index, self.index+size)]
-		self.index=indexes[-1] + 1
+		else:
+			file_list = self.test_list
+			folder = '/test/'
+			# Get [size] random numbers
+			indexes = [i%len(file_list) for i in range(self.index_test, self.index_test+size)]
+			self.index_test=indexes[-1] + 1
+
 
 		random_files = [file_list[number] for number in indexes]
 		classes = [self.classes[file.split(folder)[1].split('/')[0]] for file in random_files]
 
 		for index in range(size):
 			img = cv2.imread(random_files[index])
-
+			if img is None :
+				print(random_files[index])
+				print(indexes[index])
 
 			if img.shape[1] != self.width or img.shape[0] != self.height:
 				img = cv2.resize(img, (self.width, self.height), interpolation = cv2.INTER_AREA)
@@ -252,10 +281,10 @@ class Loader:
 			x = augmenter_seq.augment_images(x)
 
 
-		x = x.astype(np.float32) 
+		#x = x.astype(np.float32) 
 		#tf.keras.applications.imagenet_utils.preprocess_input(x, mode='tf')
-		x = tf.keras.applications.xception.preprocess_input(x)
-		#x = x.astype(np.float32) / 255.0 - 0.5
+		#x = tf.keras.applications.xception.preprocess_input(x)
+		x = x.astype(np.float32) / 255.0 - 0.5
 
 		return x, y
 
@@ -328,9 +357,9 @@ if __name__ == "__main__":
 	'''
 	#	
 
-	loader = Loader('./camvid', problemType = 'segmentation', ignore_label=11, n_classes=11)
+	loader = Loader('./dataset_segmentation', problemType = 'segmentation', ignore_label=11, n_classes=11)
 	# print(loader.median_frequency_exp())
-	x, y, mask =loader.get_batch(size=50, augmenter='segmentation')#
+	x, y, mask =loader.get_batch(size=3, augmenter='segmentation')#
 	'''
 	for i in xrange(50):
 

@@ -15,16 +15,19 @@ import tensorflow.contrib.slim as slim
 import Network
 import cv2
 import math
+import sys
+
+
 
 random.seed(os.urandom(9))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", help="Dataset to train", default='/media/msrobot/discoGordo/Corales/patch_data') 
-# parser.add_argument("--dataset", help="Dataset to train", default='dataset_classif')  # 'Datasets/MNIST-Big/'
+#parser.add_argument("--dataset", help="Dataset to train", default='dataset_classif')  # 'Datasets/MNIST-Big/'
 parser.add_argument("--init_lr", help="Initial learning rate", default=1e-4)
 parser.add_argument("--min_lr", help="Initial learning rate", default=1e-7)
-parser.add_argument("--init_batch_size", help="batch_size", default=8)
-parser.add_argument("--max_batch_size", help="batch_size", default=8)
+parser.add_argument("--init_batch_size", help="batch_size", default=32)
+parser.add_argument("--max_batch_size", help="batch_size", default=32)
 parser.add_argument("--epochs", help="Number of epochs to train", default=3)
 parser.add_argument("--width", help="width", default=224)
 parser.add_argument("--height", help="height", default=224)
@@ -58,14 +61,16 @@ training_flag = tf.placeholder(tf.bool)
 
 # Placeholder para las imagenes.
 # x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input')
-x = tf.placeholder(tf.float32, shape=[None, width, height, channels], name='input') # PUT NONE TO BE DYNAMIC
+x = tf.placeholder(tf.float32, shape=[None, None, None, channels], name='input') # PUT NONE TO BE DYNAMIC
 
 label = tf.placeholder(tf.float32, shape=[None, loader.n_classes], name='output')
 # Placeholders para las clases (vector de salida que seran valores de 0-1 por cada clase)
 
 # Network
 # output = Network.encoder_nasnet(n_classes=loader.n_classes)
-output = Network.encoder_resnet50(input_x=x, n_classes=loader.n_classes)
+output = Network.encoder_resnet101(input_x=x, n_classes=loader.n_classes,  is_training=training_flag)
+
+
 
 learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
@@ -89,7 +94,9 @@ with tf.control_dependencies(update_ops):
 	train = optimizer.minimize(cost) # VARIABLES TO OPTIMIZE 
 
 
-
+tf.profiler.profile(
+    tf.get_default_graph(),
+    options=tf.profiler.ProfileOptionBuilder.float_operation())
  
 
 
@@ -106,10 +113,9 @@ print("Total parameters of the net: " + str(total_parameters)+ " == " + str(tota
 
 
 
-
  
 # Times to show information of batch traiingn and test
-times_show_per_epoch = 15
+times_show_per_epoch = 30
 saver = tf.train.Saver(tf.global_variables())
 
 if not os.path.exists('./models/resnet_encoder/best'):
@@ -120,8 +126,9 @@ with tf.Session() as sess:
 	sess.run(tf.global_variables_initializer())
 	sess.run(tf.local_variables_initializer())
 	ckpt_best = tf.train.get_checkpoint_state('./models/resnet_encoder/best')  # Loader model if exists
-	if ckpt_best and tf.train.checkpoint_exists(ckpt_best.model_checkpoint_path):
-		saver.restore(sess, ckpt_best.model_checkpoint_path)
+	ckpt = tf.train.get_checkpoint_state('./models/resnet_encoder')  # Loader model if exists
+	if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+		saver.restore(sess, ckpt.model_checkpoint_path)
 
 
 
@@ -143,6 +150,8 @@ with tf.Session() as sess:
 
 		val_loss_acum = 0
 		accuracy_rates_acum = 0
+		accuracy_training_acum = 0
+		train_loss_acum = 0
 		times_test=0
 
 		# steps in every epoch
@@ -158,39 +167,40 @@ with tf.Session() as sess:
 
 
 			# TRAIN WITH A BATCH
-			_, loss = sess.run([train, cost], feed_dict=train_feed_dict)
-
+			_, loss, acc_train = sess.run([train, cost, accuracy ], feed_dict=train_feed_dict)
+			accuracy_training_acum = accuracy_training_acum + acc_train
+			train_loss_acum = train_loss_acum + loss
 
 			# show info
 			if step % show_each_steps == 0:
 				# SHOW TRAIN LOSS AND ACCURACY
+				if save_model:
+					saver.save(sess=sess, save_path='./models/resnet_encoder/weigths.ckpt')
+				print("Step:", (step+1), "Loss:", train_loss_acum/(step+1), "Training accuracy:", accuracy_training_acum/(step+1))
 
-				train_accuracy= sess.run([accuracy], feed_dict=train_feed_dict)
-				print("Step:", step, "Loss:", loss, "Training accuracy:", train_accuracy)
+		print("Evaluating epoch " + str(epoch) + "...")
 
-				# ACUMULATE TEST LOSS AND ACCURACY
-				batch_x_test, batch_y_test = loader.get_batch(size=batch_size, train=False)
+		# ACUMULATE TEST LOSS AND ACCURACY
+		for test_index in xrange(testing_samples // batch_size):
+			batch_x_test, batch_y_test = loader.get_batch(size=batch_size, train=False)
 
-				test_feed_dict = {
-					x: batch_x_test,
-					label: batch_y_test,
-					learning_rate: 0,
-					training_flag: 0
-				}
+			test_feed_dict = {
+				x: batch_x_test,
+				label: batch_y_test,
+				learning_rate: 0,
+				training_flag: 0
+			}
 
-				accuracy_rates,  val_loss= sess.run([accuracy, cost], feed_dict=test_feed_dict)
-			
-
-				times_test=times_test+1
-				val_loss_acum = val_loss_acum + val_loss
-				accuracy_rates_acum = accuracy_rates + accuracy_rates_acum
+			accuracy_rates,  val_loss= sess.run([accuracy, cost], feed_dict=test_feed_dict)
+		
+			times_test=times_test+1
+			val_loss_acum = val_loss_acum + val_loss
+			accuracy_rates_acum = accuracy_rates + accuracy_rates_acum
 
 
 		print('Epoch:', '%04d' % (epoch + 1), '/ Accuracy=', accuracy_rates_acum/times_test,  '/ val_loss =', val_loss_acum/times_test)
 
 		# save model
-		if save_model:
-			saver.save(sess=sess, save_path='./models/resnet_encoder/weigths.ckpt')
 		if save_model and best_val_loss > val_loss_acum:
 			print(save_model)
 			best_val_loss = val_loss_acum
