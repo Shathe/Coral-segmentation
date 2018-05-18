@@ -43,19 +43,6 @@ parser.add_argument("--train", help="if true, train, if not, test", default=1)
 args = parser.parse_args()
 
 
-igual no va ahor ala clasificacion por lo del loader y los pesos 
-
-cambiar el datast
-cambiar size a (512, 512) las clases y bueno todos los parametros que veas
-
-cambiar las variables a optimizar
-
-cambiar las variables a cargar (saver = tf.train.Saver(var_list = restore_variables))
-
-aqui vas a tener que crear dos, uno para cargar los pesos y otro para guardarlos
-
-cambiar parametro de donde coger lo spesos y dodne guardarlos ahor aes difernete!!!
-
 
 
 

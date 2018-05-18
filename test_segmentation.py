@@ -130,14 +130,14 @@ with tf.Session() as sess:
 		else:
 			confusion_matrix_total = confusion_matrix_total + matrix
 
-	if not os.path.exists('output/'):
-		os.makedirs('output/')
-		
-	image_salida = np.argmax(image_salida, 3)
-	for index_output in xrange(max_batch_size):
-		name_split = loader.image_test_list[index_output + i].split('/')
-		name = name_split[len(name_split)-1].replace('.jpg','.png').replace('.jpeg','.png')
-		cv2.imwrite('output/'+name, image_salida[index_output])
+		if not os.path.exists('output/'):
+			os.makedirs('output/')
+			
+		image_salida = np.argmax(image_salida, 3)
+		for index_output in xrange(max_batch_size):
+			name_split = loader.image_test_list[index_output + i].split('/')
+			name = name_split[len(name_split)-1].replace('.jpg','.png').replace('.jpeg','.png')
+			cv2.imwrite('output/'+name, image_salida[index_output])
 
 	print("Accuracy: " + str(acc_update))
 	print("miou: " + str(miou_total))
